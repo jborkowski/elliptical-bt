@@ -55,16 +55,24 @@ fn main() {
             client.connect(device.addr()).await.unwrap();
 
 
-
-
             let service = client
-                .get_service(uuid128!("fafafafa-fafa-fafa-fafa-fafafafafafa"))
+                .get_service(uuid128!("49535343-fe7d-4ae5-8fa9-9fafd205e455"))
                 .await
                 .unwrap();
 
+
+
             let comms_app = uuid128!("49535343-8841-43f4-a8d4-ecbe34729bb3");
 
+
+
             let characteristic = service.get_characteristic(comms_app).await.unwrap();
+
+            info!("Got characteristic");
+  
+            
+
+            info!("Char UUID {}", format!("{}", characteristic.uuid().to_string()));
 
 
             characteristic
@@ -104,40 +112,36 @@ fn main() {
                 .write_value(&EllipticalCommand::GetStatus.to_bytes(), true).await.unwrap();
 
             characteristic
+                .write_value(&EllipticalCommand::SetFanSpeed.to_bytes(), true).await.unwrap();
+
+            characteristic
+                .write_value(&EllipticalCommand::SetHotKey.to_bytes(), true).await.unwrap();
+            
+            characteristic
                 .write_value(&EllipticalCommand::GetCumulativeKm.to_bytes(), true).await.unwrap();
 
             characteristic
                 .write_value(&EllipticalCommand::GetStatus .to_bytes(), true).await.unwrap();
             let session_init_2 = [ 0x01, 0x00,0x00, 0x02, 0x01, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00];
 
-           characteristic
+            characteristic
                 .write_value(&(EllipticalCommand::SetDisplay{bytes: session_init_2}).to_bytes(), true).await.unwrap();
  
+           // characteristic.subscribe_notify(true).await.unwrap();
+
+            characteristic.on_notify(|data|                 info!("Data: {:?}", data));
             
-            
-            // characteristic.write_value();
-            let value = characteristic.read_value().await.unwrap();
-            info!(
-                "{:?} value: {}",
-                comms_app,
-                core::str::from_utf8(&value).unwrap()
-            );
-
-            let uuid = uuid128!("a3c87500-8ed3-4bdf-8a39-a01bebede295");
-            let characteristic = service.get_characteristic(uuid).await.unwrap();
-            info!("subscribe {:?}", uuid);
-            characteristic
-                .on_notify(|data| {
-                    info!("{}", core::str::from_utf8(data).unwrap());
-                })
-                .subscribe_notify(false)
-                .await
-                .unwrap();
-
-            thread::sleep(Duration::from_secs(10));
+            loop {
+              thread::sleep(Duration::from_secs(10));
+              characteristic
+                  .write_value(&EllipticalCommand::GetStatus .to_bytes(), true).await.unwrap();                
+            }
 
 
-            client.disconnect().unwrap();
+
+       
+
+//            client.disconnect().unwrap();
         } 
     }).unwrap();
 
@@ -156,6 +160,7 @@ enum EllipticalCommand {
     GetUsageHours,
     GetStatus,
     SetFanSpeed,
+    SetHotKey,
     GetCumulativeKm,
 }
 
@@ -187,7 +192,8 @@ impl EllipticalCommand {
             EllipticalCommand::SetDisplay {bytes} =>  cmd_params(0xCB, bytes), 
             EllipticalCommand::GetUsageHours => cmd_no_params(0xA5),
             EllipticalCommand::GetStatus => cmd_no_params(0xAC),
-            EllipticalCommand::SetFanSpeed => cmd_no_params(0xCA),
+            EllipticalCommand::SetFanSpeed => cmd_params(0xCA, &[0x00]),
+            EllipticalCommand::SetHotKey => cmd_params(0xCA, &[0x01]),
             EllipticalCommand::GetCumulativeKm => cmd_no_params(0xAB),
         }
     }
